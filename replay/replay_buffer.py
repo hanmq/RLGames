@@ -19,7 +19,7 @@ SizeType = Union[Tuple, List, int]
 
 class ReplayBuffer:
 
-    def __init__(self, feature_size: SizeType, device=torch.device('cuda:0'), capacity=100000, batch_size=1000):
+    def __init__(self, feature_size: SizeType, device=torch.device('cuda:0'), capacity=100000, batch_size=1024):
 
         self.capacity = capacity
 
@@ -29,7 +29,7 @@ class ReplayBuffer:
             size = (capacity, *feature_size)
 
         self.state = torch.empty(size=size, dtype=torch.float, device=device)
-
+        self.action = torch.empty(size=(capacity,), dtype=torch.int64, device=device)
         self.reward = torch.empty(size=(capacity,), dtype=torch.float, device=device)
 
         self.next_state = torch.empty(size=size, dtype=torch.float, device=device)
@@ -48,9 +48,10 @@ class ReplayBuffer:
         # memory 是否已装满
         self.memory_full = False
 
-    def push(self, state, reward, next_state, mask):
+    def push(self, state, action, reward, next_state, mask):
 
         self.state[self.position] = torch.tensor(state, device=self.device, dtype=torch.float)
+        self.action[self.position] = action
         self.next_state[self.position] = torch.tensor(next_state, device=self.device, dtype=torch.float)
 
         self.reward[self.position] = reward
@@ -68,10 +69,11 @@ class ReplayBuffer:
         idx = np.random.randint(0, max_len, size=(self.batch_size,))
 
         state = self.state[idx]
+        action = self.action[idx]
         reward = self.reward[idx]
         next_state = self.next_state[idx]
         mask = self.mask[idx]
 
-        return state, reward, next_state, mask
+        return state, action, reward, next_state, mask
 
 

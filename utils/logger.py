@@ -4,8 +4,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 
 plt.style.use("ggplot")
-plt.clf()
 f, axes = plt.subplots(4, 1, figsize=(10, 20))
+plt.clf()
 
 
 class MetricLogger:
