@@ -6,14 +6,15 @@
 import numpy as np
 import gym
 from agent.dqn import DQN
+from gym.utils.play import play
 
-env = gym.make('CartPole-v1', render_mode="human")
+env = gym.make('LunarLander-v2', render_mode="human")
 
-state, _ = env.reset(seed=42)
+state, _ = env.reset()
 
 config = {
-    'state_dim': 4,
-    'action_dim': 2,
+    'state_dim': 8,
+    'action_dim': 4,
     'save_dir': '',
     'exploration_rate': 0.1,
     'exploration_rate_decay': 0.9998,
@@ -26,20 +27,17 @@ config = {
 }
 
 agent = DQN(config)
-agent.load(r'C:\Users\mihan\Desktop\match_net_0731_cur983.340_max983.340.chkpt')
+agent.load(r'C:\Users\mihan\Desktop\match_net_0083_cur165.733_max165.733.chkpt')
 
 res = 0
 while True:
-    action = agent.select_action(state)
+    action = agent.max_action(state)
     state, reward, done, _, _ = env.step(action)
 
     res += reward
+    print(reward)
     if done:
 
         break
 
 print(res)
-
-
-
-

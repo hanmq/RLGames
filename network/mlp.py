@@ -14,19 +14,33 @@ import torch.nn.functional as F
 
 class MLP(nn.Module):
 
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, output_dim, hidden_dims=None):
         super().__init__()
 
+        if hidden_dims == None:
+            hidden_dims = [64, 32, 16]
+
+        in_dims = [input_dim] + hidden_dims[:1]
+        out_dims = hidden_dims[1:]
+
+        self.linear_lst = nn.ModuleList()
+
+        for i, o in zip(in_dims, out_dims):
+            self.linear_lst.append(
+                nn.Sequential(
+                    nn.Linear(i, o),
+                    nn.LayerNorm(o),
+                    nn.ReLU()
+                )
+            )
+
+        self.last_layer = nn.Linear(out_dims[-1], out_dims)
         self.online = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.LayerNorm(256),
+            nn.Linear(input_dim, 32),
+            nn.LayerNorm(32),
             nn.ReLU(),
 
-            nn.Linear(256, 64),
-            nn.LayerNorm(64),
-            nn.ReLU(),
-
-            nn.Linear(64, 16),
+            nn.Linear(32, 16),
             nn.LayerNorm(16),
             nn.ReLU(),
 
@@ -35,18 +49,7 @@ class MLP(nn.Module):
 
         self.target = copy.deepcopy(self.online)
 
-        # target 全程关闭 bn 和 grad
-        self.target.eval()
-
-        # Q_target parameters are frozen.
-        for p in self.target.parameters():
-            p.requires_grad = False
-
-    def forward(self, x, model='online'):
-        if model == "online":
-            return self.online(x)
-        elif model == "target":
-            return self.target(x)
-
-    def sync_q_target(self):
-        self.target.load_state_dict(self.online.state_dict())
+    def forward(self, x):
+        for l in self.linear_lst:
+            x = l(x)
+        return self.last_layer(x)

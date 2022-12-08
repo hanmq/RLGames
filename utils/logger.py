@@ -4,8 +4,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 
 plt.style.use("ggplot")
-f, axes = plt.subplots(4, 1, figsize=(10, 20))
-plt.clf()
+fig, axes = plt.subplots(4, 1, figsize=(10, 20))
 
 
 class MetricLogger:
@@ -124,7 +123,7 @@ class MetricLogger:
         axes[2].set_title('losses')
         axes[3].set_title('length')
 
-        plt.savefig(self.metric_plot)
+        fig.savefig(self.metric_plot)
 
         for ax in axes:
             ax.cla()

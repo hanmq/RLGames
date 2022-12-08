@@ -3,6 +3,7 @@
 # @File    : dqn.py
 # @Email   : mihan@lexin.com
 
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,7 @@ class DQN(object):
     """
     处理离散
     """
+
     def __init__(self, config):
         self.state_dim = config['state_dim']
         self.action_dim = config['action_dim']
@@ -30,9 +32,17 @@ class DQN(object):
 
         self.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
-        self.net = MLP(self.state_dim, self.action_dim).to(self.device)
+        self.online = MLP(self.state_dim, self.action_dim).to(self.device)
 
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)
+        self.target = copy.deepcopy(self.online)
+        # target 全程关闭 bn 和 grad
+        self.target.eval()
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
+
+        self.optimizer = torch.optim.Adam(self.online.parameters(), lr=0.00025)
         self.loss_fn = torch.nn.MSELoss()
 
         # 更新相关配置
@@ -41,7 +51,7 @@ class DQN(object):
         self.sync_every = config['sync_every']  # no. of experiences between Q_target & Q_online sync
         self.save_every = config['save_every']  # no. of experiences between saving Net
 
-        buffer_capacity = 100000 if 'buffer_capacity' not in config.keys() else config['capacity']
+        buffer_capacity = 100000 if 'buffer_capacity' not in config.keys() else config['buffer_capacity']
         buffer_size = 1024 if 'buffer_size' not in config.keys() else config['buffer_size']
         self.memory = ReplayBuffer(self.state_dim, device=self.device, capacity=buffer_capacity, batch_size=buffer_size)
 
@@ -51,13 +61,11 @@ class DQN(object):
         self.curr_reward = 0
         self.max_reward = 0
 
+        self.update_mode = config['update_mode']   # 目标网络的更新方式，'soft' 'hard'
+
     def update(self):
         if self.curr_step < self.burnin:
             return None, None
-
-        # 把 online 的参数同步到 target 上
-        if self.curr_step % self.sync_every == 0:
-            self.net.sync_q_target()
 
         # 保持模型文件
         if self.curr_step % self.save_every == 0:
@@ -78,16 +86,14 @@ class DQN(object):
         est_lst.append(td_est.mean().item())
         loss_lst.append(loss)
 
+        if self.update_mode == 'hard':
+            # 把 online 的参数同步到 target 上
+            if self.curr_step % self.sync_every == 0:
+                self.sync_q_target()
+        else:
+            self.soft_sync(1e-3)
+
         return np.mean(est_lst), np.mean(loss_lst)
-
-    def predict(self, state):
-        b, n = state.shape[0], state.shape[1]
-
-        # 各资方的 Q_value
-        channel_values = self.net(state.view(b * n, -1), model="online").view(b, n)
-        action = channel_values.argsort(dim=1, descending=True)
-
-        return action
 
     def select_action(self, state):
         # EXPLORE
@@ -113,17 +119,17 @@ class DQN(object):
         return action
 
     def max_action(self, state):
-        action = self.net(torch.tensor(state, device=self.device, dtype=torch.float), model="online").argmax().cpu().item()
+        action = self.online(torch.tensor(state, device=self.device, dtype=torch.float)).argmax().cpu().item()
         return action
 
     def td_estimate(self, state, action):
         # q(s, item)
-        current_item_q = self.net(state, model="online").gather(1, action.view(-1, 1))
+        current_item_q = self.online(state).gather(1, action.view(-1, 1))
         return current_item_q
 
     @torch.no_grad()
     def td_target(self, reward, next_state, mask):
-        target_q = self.net(next_state, model='target').max(dim=1, keepdim=True)[0]
+        target_q = self.target(next_state).max(dim=1, keepdim=True)[0]
         target = reward.view(-1, 1) + mask.view(-1, 1) * target_q
         return target
 
@@ -133,7 +139,7 @@ class DQN(object):
         loss.backward()
 
         # 梯度裁剪
-        for param in self.net.online.parameters():
+        for param in self.online.parameters():
             param.grad.data.clamp_(-1, 1)
 
         self.optimizer.step()
@@ -151,7 +157,7 @@ class DQN(object):
         file_num = int(self.curr_step // self.save_every)
         path = f'{path}/match_net_{file_num:04}_cur{self.curr_reward:.3f}_max{self.max_reward:.3f}.chkpt'
         torch.save(
-            dict(model=self.net.state_dict(), exploration_rate=self.exploration_rate),
+            dict(model=self.online.state_dict(), exploration_rate=self.exploration_rate),
             path
         )
 
@@ -159,4 +165,21 @@ class DQN(object):
 
     def load(self, path):
         model = torch.load(path, map_location=self.device)
-        self.net.load_state_dict(model['model'])
+        self.online.load_state_dict(model['model'])
+
+    def sync_q_target(self):
+        self.target.load_state_dict(self.online.state_dict())
+
+    def soft_sync(self, tau):
+        """Soft update model parameters.
+        θ_target = τ*θ_local + (1 - τ)*θ_target
+
+        Params
+        ======
+            local_model (PyTorch model): weights will be copied from
+            target_model (PyTorch model): weights will be copied to
+            tau (float): interpolation parameter
+        """
+
+        for target_param, online_param in zip(self.target.parameters(), self.online.parameters()):
+            target_param.data.copy_(tau * online_param.data + (1.0 - tau) * target_param.data)
