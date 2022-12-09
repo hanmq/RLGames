@@ -32,7 +32,8 @@ class DQN(object):
 
         self.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
-        self.online = MLP(self.state_dim, self.action_dim).to(self.device)
+        hidden_dims = None if 'hidden_dims' not in config.keys() else config['hidden_dims']
+        self.online = MLP(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
 
         self.target = copy.deepcopy(self.online)
         # target 全程关闭 bn 和 grad
@@ -42,7 +43,8 @@ class DQN(object):
         for p in self.target.parameters():
             p.requires_grad = False
 
-        self.optimizer = torch.optim.Adam(self.online.parameters(), lr=0.00025)
+        learning_rate = 0.001 if 'lr' not in config.keys() else config['lr']
+        self.optimizer = torch.optim.Adam(self.online.parameters(), lr=learning_rate)
         self.loss_fn = torch.nn.MSELoss()
 
         # 更新相关配置
