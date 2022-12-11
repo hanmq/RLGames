@@ -23,11 +23,12 @@ config = {
     'learn_every': 20,
     'sync_every': 1e4,
     'save_every': 5e5,
-    'gamma': 0.998
+    'gamma': 0.998,
+    'update_mode': 'hard'
 }
 
 agent = DQN(config)
-agent.load(r'C:\Users\mihan\Desktop\match_net_0083_cur165.733_max165.733.chkpt')
+agent.load(r'C:\Users\10575\Desktop\match_net_0102_cur177.698_max184.254.chkpt')
 
 res = 0
 while True:

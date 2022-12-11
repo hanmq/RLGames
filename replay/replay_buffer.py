@@ -74,6 +74,6 @@ class ReplayBuffer:
         next_state = self.next_state[idx]
         mask = self.mask[idx]
 
-        return state, action, reward, next_state, mask
+        return state, action.view(-1, 1), reward.view(-1, 1), next_state, mask.view(-1, 1)
 
 

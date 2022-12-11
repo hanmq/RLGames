@@ -63,7 +63,7 @@ class DQN(object):
         self.curr_reward = 0
         self.max_reward = 0
 
-        self.update_mode = config['update_mode']   # 目标网络的更新方式，'soft' 'hard'
+        self.update_mode = config['update_mode']  # 目标网络的更新方式，'soft' 'hard'
 
     def update(self):
         if self.curr_step < self.burnin:
@@ -80,11 +80,23 @@ class DQN(object):
         est_lst = []
         loss_lst = []
 
-        state, action, reward, next_state, mask = self.memory.sample()
-        td_est = self.td_estimate(state, action)
-        td_trg = self.td_target(reward, next_state, mask)
+        state, action, reward, next_state, done = self.memory.sample()
+        td_est = self.online(state).gather(1, action)
 
-        loss = self.update_q_online(td_est, td_trg)
+        target_q = self.target(next_state).detach().max(dim=1, keepdim=True)[0]
+        td_trg = reward + self.gamma * target_q * (1 - done)
+
+        loss = self.loss_fn(td_est, td_trg)
+        self.optimizer.zero_grad()
+        loss.backward()
+
+        # 梯度裁剪
+        for param in self.online.parameters():
+            param.grad.data.clamp_(-1, 1)
+
+        self.optimizer.step()
+
+        loss = loss.item()
         est_lst.append(td_est.mean().item())
         loss_lst.append(loss)
 
@@ -106,33 +118,37 @@ class DQN(object):
         else:
             action = self.max_action(state)
 
-        if self.curr_step >= self.burnin:
-            # 衰减 exploration 的概率，最低为 exploration_rate_min
-            self.exploration_rate *= self.exploration_rate_decay
-            self.exploration_rate = max(self.exploration_rate, self.exploration_rate_min)
-
         # increment step
         self.curr_step += 1
 
         return action
+
+    def update_eps(self):
+        # if self.curr_step >= self.burnin:
+        # 衰减 exploration 的概率，最低为 exploration_rate_min
+        self.exploration_rate *= self.exploration_rate_decay
+        self.exploration_rate = max(self.exploration_rate, self.exploration_rate_min)
 
     def random_action(self):
         action = np.random.randint(self.action_dim)
         return action
 
     def max_action(self, state):
-        action = self.online(torch.tensor(state, device=self.device, dtype=torch.float)).argmax().cpu().item()
+        self.online.eval()
+        with torch.no_grad():
+            action = self.online(torch.tensor(state, device=self.device, dtype=torch.float)).argmax().cpu().item()
+        self.online.train()
         return action
 
     def td_estimate(self, state, action):
         # q(s, item)
-        current_item_q = self.online(state).gather(1, action.view(-1, 1))
+        current_item_q = self.online(state).gather(1, action)
         return current_item_q
 
     @torch.no_grad()
-    def td_target(self, reward, next_state, mask):
+    def td_target(self, reward, next_state, done):
         target_q = self.target(next_state).max(dim=1, keepdim=True)[0]
-        target = reward.view(-1, 1) + mask.view(-1, 1) * target_q
+        target = reward + self.gamma * target_q * (1 - done)
         return target
 
     def update_q_online(self, td_estimate, td_target):
