@@ -20,9 +20,9 @@ class MLP(nn.Module):
         if hidden_dims == None:
             hidden_dims = [64, 32, 16]
 
-        in_dims = [input_dim] + hidden_dims[:-1]
         self.linear_lst = nn.ModuleList()
 
+        in_dims = [input_dim] + hidden_dims[:-1]
         for i, o in zip(in_dims, hidden_dims):
             self.linear_lst.append(
                 nn.Sequential(
