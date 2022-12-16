@@ -6,6 +6,7 @@
 import numpy as np
 import gym
 from agent.dqn import DQN
+from agent.noisy_dqn import NoisyDQN
 from gym.utils.play import play
 
 env = gym.make('LunarLander-v2', render_mode="human")
@@ -24,11 +25,15 @@ config = {
     'sync_every': 1e4,
     'save_every': 5e5,
     'gamma': 0.998,
-    'update_mode': 'hard'
+    'update_mode': 'hard',
+    'lr': 0.001,
+    'hidden_dims': [128, 128],
+    # 'loss_fn': torch.nn.SmoothL1Loss(),
+    'netword': 'local'  # 自己实现的网络结构
 }
 
-agent = DQN(config)
-agent.load(r'C:\Users\10575\Desktop\match_net_0102_cur177.698_max184.254.chkpt')
+agent = NoisyDQN(config)
+agent.load(r'C:\Users\mihan\Desktop\match_net_0075_cur260.014_max265.268.chkpt')
 
 res = 0
 while True:

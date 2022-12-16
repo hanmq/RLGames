@@ -64,19 +64,17 @@ class NoisyLinear(nn.Module):
         self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in))
         self.bias_epsilon.copy_(epsilon_out)
 
-    def forward(self, x: torch.Tensor, is_train=True) -> torch.Tensor:
-        """
-        eval 的时候，去掉噪音
-        """
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward method implementation.
 
-        if is_train:
-            weight = self.weight_mu + self.weight_sigma * self.weight_epsilon
-            bias = self.bias_mu + self.bias_sigma * self.bias_epsilon
-        else:
-            weight = self.weight_mu
-            bias = self.bias_mu
-
-        return F.linear(x, weight, bias)
+        We don't use separate statements on train / eval mode.
+        It doesn't show remarkable difference of performance.
+        """
+        return F.linear(
+            x,
+            self.weight_mu + self.weight_sigma * self.weight_epsilon,
+            self.bias_mu + self.bias_sigma * self.bias_epsilon,
+        )
 
     @staticmethod
     def scale_noise(size: int) -> torch.Tensor:
@@ -116,15 +114,15 @@ class NoisyNet(nn.Module):
 
         self.last_layer = NoisyLinear(in_dims[-1], out_dims[-1])
 
-    def forward(self, x, is_train=True):
+    def forward(self, x):
         for l in self.linear_lst:
             x = l(x)
 
         for l in self.noisy_linear_lst:
-            x = l(x, is_train=is_train)
+            x = l(x)
             x = F.relu(x)
 
-        return self.last_layer(x, is_train=is_train)
+        return self.last_layer(x)
 
     def reset_noise(self):
         """Reset all noisy layers."""

@@ -31,6 +31,7 @@ class NoisyDQN(object):
 
         hidden_dims = None if 'hidden_dims' not in config.keys() else config['hidden_dims']
         self.online = NoisyNet(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
+        # self.online = Network(self.state_dim, self.action_dim).to(self.device)
 
         self.target = copy.deepcopy(self.online)
         # target 全程关闭 bn 和 grad
@@ -42,7 +43,11 @@ class NoisyDQN(object):
 
         learning_rate = 0.001 if 'lr' not in config.keys() else config['lr']
         self.optimizer = torch.optim.Adam(self.online.parameters(), lr=learning_rate)
-        self.loss_fn = torch.nn.MSELoss()
+
+        if 'loss_fn' in config:
+            self.loss_fn = config['loss_fn']
+        else:
+            self.loss_fn = torch.nn.SmoothL1Loss()  # torch.nn.MSELoss()
 
         # 更新相关配置
         self.burnin = config['burnin']  # min. experiences before training
@@ -92,6 +97,8 @@ class NoisyDQN(object):
         else:
             self.soft_sync(1e-3)
 
+        # noisy net 必须是每 update 一次，更新一次 noisy ，不能是每隔
+        self.reset_noise()
         return np.mean(est_lst), np.mean(loss_lst)
 
     def select_action(self, state):
