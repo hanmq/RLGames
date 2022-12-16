@@ -33,7 +33,7 @@ config = {
 }
 
 agent = NoisyDQN(config)
-agent.load(r'C:\Users\mihan\Desktop\match_net_0075_cur260.014_max265.268.chkpt')
+agent.load(r'model_file/noisy_dqn.chkpt')
 
 res = 0
 while True:

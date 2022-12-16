@@ -33,6 +33,10 @@ def train(env, agent, logger, episodes=1000):
 
             next_state, reward, done, _, _ = env.step(action)
 
+            # 减少卡住，一直浮空的情况
+            if i == 1000:
+                reward = -100
+
             agent.memory.push(state, action, reward, next_state, done)
 
             q, loss = agent.update()
@@ -51,6 +55,7 @@ def train(env, agent, logger, episodes=1000):
             if done:
                 break
 
+        # agent.reset_noise()
         logger.log_episode()
 
 
@@ -76,6 +81,7 @@ def main():
         'update_mode': 'hard',
         'lr': 0.001,
         'hidden_dims': [128, 128],
+        # 相比之下，用 MSE 学习会更慢
         'loss_fn': torch.nn.SmoothL1Loss(),
         'netword': 'local'  # 自己实现的网络结构
     }

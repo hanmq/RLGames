@@ -1,10 +1,13 @@
-# @Time    : 2022/12/12 21:30
+# @Time    : 2022/12/16 18:13
 # @Author  : mihan
-# @File    : noisy_dqn.py
+# @File    : noisy_ddqn.py
 
 """
-DQN 基础上加上 noisyNet
+noisy_dqn 基础上加上 Double DQN ，缓解 Q 值预估过高的问题
+noisy_dqn 和 dqn 在训练 LunarLander-v2 时有个明显的问题：训练大概 1000 个 episode 之后，
+Q 值会突然迅速上升，reward 也跟着下降，应该是比较明显的 Q 值预估过高的问题
 """
+
 
 import copy
 from pathlib import Path
@@ -16,7 +19,7 @@ from replay.replay_buffer import ReplayBuffer
 from network.noisy_net import NoisyNet
 
 
-class NoisyDQN(object):
+class DoubleDQN(object):
     """
     处理离散
     """
@@ -116,10 +119,8 @@ class NoisyDQN(object):
         return action
 
     def max_action(self, state):
-        self.online.eval()
         with torch.no_grad():
             action = self.online(torch.tensor(state, device=self.device, dtype=torch.float)).argmax().cpu().item()
-        self.online.train()
         return action
 
     def td_estimate(self, state, action):
@@ -129,7 +130,10 @@ class NoisyDQN(object):
 
     @torch.no_grad()
     def td_target(self, reward, next_state, done):
-        target_q = self.target(next_state).max(dim=1, keepdim=True)[0]
+        # Double DQN：用 online 选择一个最大价值的动作，然后用 target 算 value，避免估算的 q 过大的问题
+        best_action = self.online(next_state).argmax(dim=1, keepdim=True)
+        target_q = self.target(next_state).gather(1, best_action)
+
         target = reward + self.gamma * target_q * (1 - done)
         return target
 
@@ -186,3 +190,4 @@ class NoisyDQN(object):
     def reset_noise(self):
         self.online.reset_noise()
         self.target.reset_noise()
+
