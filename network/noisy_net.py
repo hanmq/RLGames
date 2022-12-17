@@ -86,37 +86,23 @@ class NoisyLinear(nn.Module):
 
 class NoisyNet(nn.Module):
 
-    def __init__(self, input_dim, output_dim, hidden_dims=None, noisy_num=3):
+    def __init__(self, input_dim, output_dim, hidden_dims=None):
         super().__init__()
 
         if hidden_dims == None:
-            hidden_dims = [64, 32, 16]
-
-        self.linear_lst = nn.ModuleList()
+            hidden_dims = [128, 128]
 
         in_dims = [input_dim] + hidden_dims
         out_dims = hidden_dims + [output_dim]
 
-        # 普通全连接层
-        for i, o in zip(in_dims[:-noisy_num], out_dims[:-noisy_num]):
-            self.linear_lst.append(
-                nn.Sequential(
-                    nn.Linear(i, o),
-                    nn.ReLU()
-                )
-            )
-
         self.noisy_linear_lst = nn.ModuleList()
-
         # noisy net 全连接层
-        for i, o in zip(in_dims[-noisy_num:-1], out_dims[-noisy_num:-1]):
+        for i, o in zip(in_dims[:-1], out_dims[:-1]):
             self.noisy_linear_lst.append(NoisyLinear(i, o))
 
         self.last_layer = NoisyLinear(in_dims[-1], out_dims[-1])
 
     def forward(self, x):
-        for l in self.linear_lst:
-            x = l(x)
 
         for l in self.noisy_linear_lst:
             x = l(x)

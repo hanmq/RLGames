@@ -4,11 +4,11 @@
 
 以下都是按照日期排序，
 
-| 日期 | agent        | env            | trainer              | reward |
-| ---- | ------------ | -------------- | -------------------- | ------ |
-|      | dqn.py       | CartPole-v1    | 未保留               | inf    |
-|      | noisy_dqn.py | LunarLander-v2 | noisy_dqn_trainer.py | 270    |
-|      | ddqn.py      |                |                      |        |
+| agent        | env            | trainer              | model_fle       | reward |
+| ------------ | -------------- | -------------------- | --------------- | ------ |
+| dqn.py       | CartPole-v1    | 未保留               |                 | inf    |
+| noisy_dqn.py | LunarLander-v2 | noisy_dqn_trainer.py | noisy_dqn.chkpt | 250    |
+| ddqn.py      | LunarLander-v2 | noisy_dqn_trainer.py | ddqn.chkpt      | 250    |
 
 
 

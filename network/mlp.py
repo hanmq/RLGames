@@ -27,7 +27,6 @@ class MLP(nn.Module):
             self.linear_lst.append(
                 nn.Sequential(
                     nn.Linear(i, o),
-                    nn.LayerNorm(o),
                     nn.ReLU()
                 )
             )

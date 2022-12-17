@@ -17,6 +17,7 @@ import gym
 
 from agent.dqn import DQN
 from agent.noisy_dqn import NoisyDQN
+from agent.ddqn import DoubleDQN
 from utils.logger import MetricLogger
 
 
@@ -86,7 +87,8 @@ def main():
         'netword': 'local'  # 自己实现的网络结构
     }
 
-    agent = NoisyDQN(config)
+    # agent = NoisyDQN(config)
+    agent = DoubleDQN(config)
     logger = MetricLogger(save_dir, config)
 
     train(env, agent, logger, 1000)
