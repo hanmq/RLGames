@@ -14,15 +14,14 @@ env = gym.make('ALE/Pong-v5', render_mode="human")
 state = env.reset()
 env.step(4)
 
-# res = 0
-# while True:
-#     state, reward, done, _, _ = env.step(env.action_space.sample())
-#
-#     res += reward
-#     print(reward)
-#     if done:
-#
-#         break
+res = 0
+while True:
+    state, reward, done, _ = env.step(env.action_space.sample())
+    res += reward
+    print(reward)
+    if done:
+
+        break
 
 # config = {
 #     'state_dim': 8,

@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 from replay.replay_buffer import ReplayBuffer
-from network.dueling_net import DuelingNet
+from network.dueling_net import DuelingNet, DuelingCNN
 
 
 class DuelingDQN(object):
@@ -34,7 +34,7 @@ class DuelingDQN(object):
         self.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
         hidden_dims = None if 'hidden_dims' not in config.keys() else config['hidden_dims']
-        self.online = DuelingNet(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
+        self.online = DuelingCNN(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
         # self.online = Network(self.state_dim, self.action_dim).to(self.device)
 
         self.target = copy.deepcopy(self.online)

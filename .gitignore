@@ -132,3 +132,5 @@ dmypy.json
 test.py
 tensorgboard
 runs
+test_dir
+test1.py
