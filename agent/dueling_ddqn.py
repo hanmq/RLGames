@@ -34,7 +34,8 @@ class DuelingDQN(object):
         self.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
         hidden_dims = None if 'hidden_dims' not in config.keys() else config['hidden_dims']
-        self.online = DuelingCNN(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
+        self.online = DuelingCNN(self.action_dim, hidden_dims=hidden_dims).to(self.device)
+        # self.online = DuelingNet(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
         # self.online = Network(self.state_dim, self.action_dim).to(self.device)
 
         self.target = copy.deepcopy(self.online)
@@ -87,6 +88,9 @@ class DuelingDQN(object):
         loss_lst = []
 
         state, action, reward, next_state, done = self.memory.sample()
+        state = state.unsqueeze(1)
+        next_state = next_state.unsqueeze(1)
+
         td_est = self.td_estimate(state, action)
         td_trg = self.td_target(reward, next_state, done)
         loss = self.update_q_online(td_est, td_trg)

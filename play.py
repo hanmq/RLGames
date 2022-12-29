@@ -10,18 +10,22 @@ from agent.noisy_dqn import NoisyDQN
 from agent.ddqn import DoubleDQN
 from gym.utils.play import play
 
-env = gym.make('ALE/Pong-v5', render_mode="human")
+env = gym.make('ALE/Pong-v5')
 state = env.reset()
 env.step(4)
 
 res = 0
+i = 0
 while True:
+
     state, reward, done, _ = env.step(env.action_space.sample())
     res += reward
-    print(reward)
+    i += 1
     if done:
 
         break
+
+print(i)
 
 # config = {
 #     'state_dim': 8,

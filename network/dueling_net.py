@@ -69,20 +69,12 @@ input_type = Union[List, Tuple]
 
 
 class DuelingCNN(nn.Module):
-    def __init__(self, input_dim: input_type, output_dim, hidden_dims=None):
+    def __init__(self, output_dim, hidden_dims=None):
         super(DuelingCNN, self).__init__()
 
-        if len(input_dim) == 3:
-            c, h, w = input_dim
-        else:
-            h, w = input_dim
-            c = 1
+        self.cnn = CNN()
 
-        self.cnn = CNN(in_channel=c)
-        h = h // 16 - 4
-        w = w // 16 - 4
-
-        input_dim = h * w * 128
+        input_dim = 3 * 3 * 64
 
         self.dueling_fc = DuelingNet(input_dim, output_dim, hidden_dims)
 
