@@ -14,11 +14,11 @@ import torch.nn.functional as F
 
 
 class CNN(nn.Module):
-    def __init__(self):
+    def __init__(self, in_channel=4):
         super(CNN, self).__init__()
 
-        self.features = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels=in_channel, out_channels=32, kernel_size=8, stride=4),
             nn.BatchNorm2d(32),
             nn.ReLU(),
 
@@ -28,11 +28,9 @@ class CNN(nn.Module):
 
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.BatchNorm2d(64),
-            nn.ReLU(),
-
-            nn.MaxPool2d(kernel_size=2, stride=2)
+            nn.ReLU()
         )
 
     def forward(self, x):
-        x = self.features(x)
+        x = self.conv(x)
         return x.view(x.size(0), -1)

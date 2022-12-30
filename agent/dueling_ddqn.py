@@ -6,7 +6,6 @@
 在 Double DQN 基础上加上 dueling net
 """
 
-
 import copy
 from pathlib import Path
 
@@ -29,12 +28,19 @@ class DuelingDQN(object):
         # 日志保存地址
         self.save_dir = config['save_dir']
 
+        self.exploration_rate = config.get('exploration_rate', 1)
+        self.exploration_rate_decay = config.get('exploration_rate_decay', 0.99)
+        self.exploration_rate_min = config.get('exploration_rate_min', 0.02)
         self.curr_step = 0
 
         self.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
+        # True for noisy net, False for Epsilon-Greedy
+        self.is_noisy = config['is_noisy']
+
         hidden_dims = None if 'hidden_dims' not in config.keys() else config['hidden_dims']
-        self.online = DuelingCNN(self.action_dim, hidden_dims=hidden_dims).to(self.device)
+        self.online = DuelingCNN(self.state_dim, self.action_dim, hidden_dims=hidden_dims, noisy=self.is_noisy).to(
+            self.device)
         # self.online = DuelingNet(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
         # self.online = Network(self.state_dim, self.action_dim).to(self.device)
 
@@ -88,8 +94,6 @@ class DuelingDQN(object):
         loss_lst = []
 
         state, action, reward, next_state, done = self.memory.sample()
-        state = state.unsqueeze(1)
-        next_state = next_state.unsqueeze(1)
 
         td_est = self.td_estimate(state, action)
         td_trg = self.td_target(reward, next_state, done)
@@ -106,15 +110,37 @@ class DuelingDQN(object):
             self.soft_sync(1e-3)
 
         # noisy net 必须是每 update 一次，更新一次 noisy ，不能是每隔
-        self.reset_noise()
+        if self.is_noisy:
+            self.reset_noise()
         return np.mean(est_lst), np.mean(loss_lst)
 
     def select_action(self, state):
-        action = self.max_action(state)
+
+        if self.is_noisy:
+            action = self.max_action(state)
+        else:
+            # EXPLORE
+            if np.random.rand() < self.exploration_rate:
+                # 随机返回资方排序
+                action = self.random_action()
+            # EXPLOIT
+            else:
+                action = self.max_action(state)
+
         # increment step
         self.curr_step += 1
 
         return action
+
+    def update_eps(self):
+        """
+        在一个 episode 结束时，降低一次探索率
+        :return:
+        """
+        # if self.curr_step >= self.burnin:
+        # 衰减 exploration 的概率，最低为 exploration_rate_min
+        self.exploration_rate *= self.exploration_rate_decay
+        self.exploration_rate = max(self.exploration_rate, self.exploration_rate_min)
 
     def random_action(self):
         action = np.random.randint(self.action_dim)
@@ -192,4 +218,3 @@ class DuelingDQN(object):
     def reset_noise(self):
         self.online.reset_noise()
         self.target.reset_noise()
-

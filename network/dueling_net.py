@@ -7,6 +7,7 @@ import math
 
 from typing import Union, List, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,7 +17,7 @@ from network.cnn import CNN
 
 
 class DuelingNet(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dims=None):
+    def __init__(self, input_dim, output_dim, hidden_dims=None, noisy=True):
         """
         最
         :param input_dim:
@@ -32,16 +33,19 @@ class DuelingNet(nn.Module):
         out_dims = hidden_dims + [output_dim]
 
         self.feather_layer_lst = nn.ModuleList()
+        self.noisy = noisy
+
+        lc_f = NoisyLinear if noisy else nn.Linear
 
         for i, o in zip(in_dims[:-2], out_dims[:-2]):
-            self.feather_layer_lst.append(NoisyLinear(i, o))
+            self.feather_layer_lst.append(lc_f(i, o))
 
         # 最后两层网络，advantage 和 value 分不同参数，之前两个共享参数
-        self.advantage_layer2 = NoisyLinear(in_dims[-2], out_dims[-2])
-        self.value_layer2 = NoisyLinear(in_dims[-2], out_dims[-2])
+        self.advantage_layer2 = lc_f(in_dims[-2], out_dims[-2])
+        self.value_layer2 = lc_f(in_dims[-2], out_dims[-2])
 
-        self.advantage_layer1 = NoisyLinear(in_dims[-1], out_dims[-1])
-        self.value_layer1 = NoisyLinear(in_dims[-1], 1)
+        self.advantage_layer1 = lc_f(in_dims[-1], out_dims[-1])
+        self.value_layer1 = lc_f(in_dims[-1], 1)
 
     def forward(self, x):
         for lc in self.feather_layer_lst:
@@ -55,28 +59,38 @@ class DuelingNet(nn.Module):
 
     def reset_noise(self):
         """Reset all noisy layers."""
-        for lc in self.feather_layer_lst:
-            lc.reset_noise()
+        if self.noisy:
+            for lc in self.feather_layer_lst:
+                lc.reset_noise()
 
-        self.advantage_layer2.reset_noise()
-        self.value_layer2.reset_noise()
+            self.advantage_layer2.reset_noise()
+            self.value_layer2.reset_noise()
 
-        self.advantage_layer1.reset_noise()
-        self.value_layer1.reset_noise()
+            self.advantage_layer1.reset_noise()
+            self.value_layer1.reset_noise()
 
 
 input_type = Union[List, Tuple]
 
 
 class DuelingCNN(nn.Module):
-    def __init__(self, output_dim, hidden_dims=None):
+    def __init__(self, input_dim: input_type, output_dim, hidden_dims=None, noisy=True):
+        """
+
+        :param input_dim: (c, h, w)
+        :param output_dim:
+        :param hidden_dims:
+        :param noisy:
+        """
         super(DuelingCNN, self).__init__()
+        c, h, w = input_dim
+        self.noisy = noisy
 
-        self.cnn = CNN()
+        self.cnn = CNN(in_channel=c)
 
-        input_dim = 3 * 3 * 64
+        input_dim = self._get_cnn_out(input_dim)
 
-        self.dueling_fc = DuelingNet(input_dim, output_dim, hidden_dims)
+        self.dueling_fc = DuelingNet(input_dim, output_dim, hidden_dims, noisy)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -84,4 +98,9 @@ class DuelingCNN(nn.Module):
         return x
 
     def reset_noise(self):
-        self.dueling_fc.reset_noise()
+        if self.noisy:
+            self.dueling_fc.reset_noise()
+
+    def _get_cnn_out(self, input_dim):
+        o = self.cnn(torch.ones(1, *input_dim))
+        return int(np.prod(o.size()))
