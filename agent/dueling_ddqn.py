@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from replay.replay_buffer import ReplayBuffer
-from network.dueling_net import DuelingNet, DuelingCNN
+from network.dueling_net import DuelingNet, DuelingCNN, DuelCNN
 
 
 class DuelingDQN(object):
@@ -39,9 +39,13 @@ class DuelingDQN(object):
         self.is_noisy = config['is_noisy']
 
         hidden_dims = None if 'hidden_dims' not in config.keys() else config['hidden_dims']
-        self.online = DuelingCNN(self.state_dim, self.action_dim, hidden_dims=hidden_dims, noisy=self.is_noisy).to(
-            self.device)
-        # self.online = DuelingNet(self.state_dim, self.action_dim, hidden_dims=hidden_dims).to(self.device)
+        self.online = DuelingCNN(
+            self.state_dim, self.action_dim, hidden_dims=hidden_dims, noisy=self.is_noisy).to(self.device)
+
+        # self.online = DuelingNet(
+        #     self.state_dim, self.action_dim, hidden_dims=hidden_dims, noisy=self.is_noisy).to(self.device)
+
+        # self.online = DuelCNN(h=80, w=80, output_size=self.action_dim).to(self.device)
         # self.online = Network(self.state_dim, self.action_dim).to(self.device)
 
         self.target = copy.deepcopy(self.online)
@@ -80,7 +84,7 @@ class DuelingDQN(object):
 
     def update(self):
         if self.curr_step < self.burnin:
-            return None, None
+            return 0, 0, 0
 
         # 保持模型文件
         if self.curr_step % self.save_every == 0:
@@ -88,19 +92,13 @@ class DuelingDQN(object):
 
         # 每隔 learn_every 步更新一次模型，
         if self.curr_step % self.learn_every != 0:
-            return None, None
-
-        est_lst = []
-        loss_lst = []
+            return 0, 0, 0
 
         state, action, reward, next_state, done = self.memory.sample()
 
         td_est = self.td_estimate(state, action)
         td_trg = self.td_target(reward, next_state, done)
-        loss = self.update_q_online(td_est, td_trg)
-
-        est_lst.append(td_est.mean().item())
-        loss_lst.append(loss)
+        loss, total_norm = self.update_q_online(td_est, td_trg)
 
         if self.update_mode == 'hard':
             # 把 online 的参数同步到 target 上
@@ -112,7 +110,9 @@ class DuelingDQN(object):
         # noisy net 必须是每 update 一次，更新一次 noisy ，不能是每隔
         if self.is_noisy:
             self.reset_noise()
-        return np.mean(est_lst), np.mean(loss_lst)
+
+        q_est = td_est.mean().item()
+        return q_est, loss, total_norm
 
     def select_action(self, state):
 
@@ -170,11 +170,13 @@ class DuelingDQN(object):
         self.optimizer.zero_grad()
         loss.backward()
 
+        total_norm = torch.nn.utils.clip_grad_norm_(self.online.parameters(), 1)
+
         self.optimizer.step()
 
         # 每次更新网络之后，都要重新采样噪音
         # self.reset_noise()
-        return loss.item()
+        return loss.item(), total_norm.item()
 
     def update_reward(self, mean_ep_reward):
         self.curr_reward = mean_ep_reward

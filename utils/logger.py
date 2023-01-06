@@ -29,12 +29,14 @@ class MetricLogger:
         self.ep_lengths = []
         self.ep_avg_losses = []
         self.ep_avg_qs = []
+        self.ep_avg_norm = []
 
         # Moving averages, added for every call to record()
         self.moving_avg_ep_rewards = []
         self.moving_avg_ep_lengths = []
         self.moving_avg_ep_avg_losses = []
         self.moving_avg_ep_avg_qs = []
+        self.moving_avg_ep_avg_norm = []
 
         # Current episode metric
         self.init_episode()
@@ -47,14 +49,16 @@ class MetricLogger:
         self.curr_ep_loss = 0.0
         self.curr_ep_q = 0.0
         self.curr_ep_loss_length = 0
+        self.curr_ep_norm = 0
 
-    def log_step(self, reward, loss, q):
+    def log_step(self, reward, loss, q, norm):
         self.curr_ep_reward += reward
         self.curr_ep_length += 1
         if loss:
             self.curr_ep_loss += loss
             self.curr_ep_q += q
             self.curr_ep_loss_length += 1
+            self.curr_ep_norm += norm
 
     def log_episode(self):
         "Mark end of episode"
@@ -63,11 +67,14 @@ class MetricLogger:
         if self.curr_ep_loss_length == 0:
             ep_avg_loss = 0
             ep_avg_q = 0
+            ep_avg_norm = 0
         else:
             ep_avg_loss = np.round(self.curr_ep_loss / self.curr_ep_loss_length, 5)
             ep_avg_q = np.round(self.curr_ep_q / self.curr_ep_loss_length, 5)
+            ep_avg_norm = np.round(self.curr_ep_norm / self.curr_ep_loss_length, 5)
         self.ep_avg_losses.append(ep_avg_loss)
         self.ep_avg_qs.append(ep_avg_q)
+        self.ep_avg_norm.append(ep_avg_norm)
 
         self.init_episode()
 
@@ -77,6 +84,7 @@ class MetricLogger:
         self.curr_ep_loss = 0.0
         self.curr_ep_q = 0.0
         self.curr_ep_loss_length = 0
+        self.curr_ep_norm = 0
 
     def record(self, episode, epsilon, step):
         # 记录最近 100 个 episode 的平均 reward、长度、平均 loss、平均 q 值
@@ -84,6 +92,8 @@ class MetricLogger:
         mean_ep_length = np.round(np.mean(self.ep_lengths[-100:]), 3)
         mean_ep_loss = np.round(np.mean(self.ep_avg_losses[-100:]), 6)
         mean_ep_q = np.round(np.mean(self.ep_avg_qs[-100:]), 3)
+        mean_ep_norm = np.round(self.ep_avg_norm[-1], 4)
+
         self.moving_avg_ep_rewards.append(mean_ep_reward)
         self.moving_avg_ep_lengths.append(mean_ep_length)
         self.moving_avg_ep_avg_losses.append(mean_ep_loss)
@@ -96,11 +106,12 @@ class MetricLogger:
         print(
             f"Episode {episode} - "
             f"Step {step} - "
-            f"Epsilon {epsilon} - "
+            f"Epsilon {epsilon:.4f} - "
             f"Mean Reward {mean_ep_reward} - "
             f"Mean Length {mean_ep_length} - "
             f"Mean Loss {mean_ep_loss} - "
             f"Mean Q Value {mean_ep_q} - "
+            f"Mean norm {mean_ep_norm} - "
             f"Time Delta {time_since_last_record} - "
             f"Time {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
