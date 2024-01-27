@@ -7,7 +7,6 @@ import os
 # os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 from datetime import datetime
-import numpy_financial as npf
 import pandas as pd
 import torch
 

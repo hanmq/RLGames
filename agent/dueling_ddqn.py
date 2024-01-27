@@ -81,6 +81,7 @@ class DuelingDQN(object):
         self.max_reward = 0
 
         self.update_mode = config['update_mode']  # 目标网络的更新方式，'soft' 'hard'
+        self.tau = config.get('tau', 1e-3)
 
     def update(self):
         if self.curr_step < self.burnin:
@@ -100,19 +101,48 @@ class DuelingDQN(object):
         td_trg = self.td_target(reward, next_state, done)
         loss, total_norm = self.update_q_online(td_est, td_trg)
 
+        q_est = td_est.mean().item()
+
+        # state, action, reward, next_state, done = self.memory.sample()
+        #
+        # # Make predictions
+        # state_q_values = self.online(state)
+        # next_states_q_values = self.online(next_state)
+        # next_states_target_q_values = self.target(next_state)
+        #
+        # # Find selected action's q_value
+        # # selected_q_value = state_q_values.gather(1, action.unsqueeze(1)).squeeze(1)
+        # selected_q_value = state_q_values.gather(1, action)  # .squeeze(1)
+        #
+        # # Get indice of the max value of next_states_q_values
+        # # Use that indice to get a q_value from next_states_target_q_values
+        # # We use greedy for policy So it called off-policy
+        # next_states_target_q_value = next_states_target_q_values.gather(1, next_states_q_values.max(1)[1].unsqueeze(
+        #     1))  # .squeeze(1)
+        # # Use Bellman function to find expected q value
+        # expected_q_value = reward + self.gamma * next_states_target_q_value * (1 - done)
+        #
+        # # Calc loss with expected_q_value and q_value
+        # loss = (selected_q_value - expected_q_value.detach()).pow(2).mean()
+        #
+        # self.optimizer.zero_grad()
+        # loss.backward()
+        # self.optimizer.step()
+        # q_est = selected_q_value.mean().item()
+        # loss = loss.item()
+
         if self.update_mode == 'hard':
             # 把 online 的参数同步到 target 上
             if self.curr_step % self.sync_every == 0:
                 self.sync_q_target()
         else:
-            self.soft_sync(1e-3)
+            self.soft_sync(self.tau)
 
         # noisy net 必须是每 update 一次，更新一次 noisy ，不能是每隔
         if self.is_noisy:
             self.reset_noise()
 
-        q_est = td_est.mean().item()
-        return q_est, loss, total_norm
+        return q_est, loss, 0
 
     def select_action(self, state):
 
@@ -170,13 +200,13 @@ class DuelingDQN(object):
         self.optimizer.zero_grad()
         loss.backward()
 
-        total_norm = torch.nn.utils.clip_grad_norm_(self.online.parameters(), 1)
+        # total_norm = torch.nn.utils.clip_grad_norm_(self.online.parameters(), 1)
 
         self.optimizer.step()
 
         # 每次更新网络之后，都要重新采样噪音
         # self.reset_noise()
-        return loss.item(), total_norm.item()
+        return loss.item(), 0  # total_norm.item()
 
     def update_reward(self, mean_ep_reward):
         self.curr_reward = mean_ep_reward
